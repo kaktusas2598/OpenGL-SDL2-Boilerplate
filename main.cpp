@@ -10,6 +10,8 @@
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <glm/gtx/transform.hpp>//For tranform matrices
+#include <glm/gtc/matrix_transform.hpp>//For scaling and rotation matrices
 using namespace glm;
 
 //CONSTANTS
@@ -36,6 +38,41 @@ int main(int argc, char *argv[]){
 	if (!initSystems()) {
 		return -1;
 	}
+
+	glm::mat4 myMatrix = glm::translate(glm::mat4(), glm::vec3(10.0f, 0.0f, 0.0f));
+	glm::vec4 myVector(10.0f, 10.0f, 10.0f, 0.0f);//1-point, 0 - direction
+	// fill myMatrix and myVector somehow
+	glm::vec4 transformedVector = myMatrix * myVector; // Again, in this order ! this is important.
+
+	glm::mat4 myIdentityMatrix = glm::mat4(1.0f);
+
+	//glm::mat4 myScalingMatrix = glm::scale(2.0f, 2.0f ,2.0f);
+
+	//Most common order for game characters
+	//REMEMBER: matrix multiplication order does matter!
+	//TransformedVector = TranslationMatrix * RotationMatrix * ScaleMatrix * OriginalVector;
+
+	//Transformation flow:
+	//	Model coords -> Model Matrix
+	//	Worlds coords -> View Matrix
+	//	Camera coords -> Projection Matrix
+	//	Homogeneous Coords
+	//GLM helper matrices
+	//CAMERA MATRIX
+	//glm::mat4 CameraMatrix = glm::lookAt(
+    //cameraPosition, // the position of your camera, in world space
+    //cameraTarget,   // where you want to look at, in world space
+    //upVector        // probably glm::vec3(0,1,0), but (0,-1,0) would make you looking upside-down, which can be great too
+	//);
+	// Generates a really hard-to-read matrix, but a normal, standard 4x4 matrix nonetheless
+	//PROJECTION MATRIX
+	//glm::mat4 projectionMatrix = glm::perspective(
+    //glm::radians(FoV), // The vertical Field of View, in radians: the amount of "zoom". Think "camera lens". Usually between 90° (extra wide) and 30° (quite zoomed in)
+    //4.0f / 3.0f,       // Aspect Ratio. Depends on the size of your window. Notice that 4/3 == 800/600 == 1280/960, sounds familiar ?
+    //0.1f,              // Near clipping plane. Keep as big as possible, or you'll get precision issues.
+    //100.0f             // Far clipping plane. Keep as little as possible.
+	//);
+
 
 	//CREATE VAO
 	//Do this once window is created(And GL Context too) and before any other OpenGL calls
