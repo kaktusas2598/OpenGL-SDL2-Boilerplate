@@ -14,10 +14,12 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>//For tranform matrices
 #include <glm/gtc/matrix_transform.hpp>//For scaling and rotation matrices
+using namespace glm;
 
 #include "common/ShaderLoader.hpp"
 
-using namespace glm;
+#include "selene.h"
+using namespace sel;
 
 //CONSTANTS
 const int screenWidth=1024;//4:3
@@ -178,8 +180,9 @@ void configureVBO(int vertexAttributeID, GLuint vboID, int dataPerVertex) {
 	glVertexAttribPointer(vertexAttributeID, dataPerVertex, GL_FLOAT, GL_FALSE, 0, (void*)0);
 }
 
-
 int main(int argc, char *argv[]){
+
+	State state; // creates a Lua context
 
 	//Init random seed
 	//For truly random numbers, Perlin Noise?
