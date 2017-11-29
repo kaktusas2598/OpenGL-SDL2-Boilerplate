@@ -1,8 +1,10 @@
 //THIS IS ONLY TEST SCRIPT, DEDICATED TO PLAY WITH OPENGL
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>       /* time, for random seed */
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include <GL/glew.h>
 
 #include <iostream>
@@ -12,96 +14,272 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/transform.hpp>//For tranform matrices
 #include <glm/gtc/matrix_transform.hpp>//For scaling and rotation matrices
+
+#include "common/ShaderLoader.hpp"
+
 using namespace glm;
 
 //CONSTANTS
-const int screenWidth=640;
-const int screenHeight=480;
+const int screenWidth=1024;//4:3
+const int screenHeight=768;
+const int ScreenFps = 60;
+const int ScreenTicksPerFrame = 1000 / ScreenFps;
 
-static const GLfloat g_vertex_buffer_data[] = {
+static GLfloat g_vertex_buffer_data_triangle[] = {
 	-1.0f, -1.0f, 0.0f,
 	1.0f, -1.0f, 0.0f,
 	0.0f,  1.0f, 0.0f,
+};
+
+// Our vertices. Three consecutive floats give a 3D vertex; Three consecutive vertices give a triangle.
+// A cube has 6 faces with 2 triangles each, so this makes 6*2=12 triangles, and 12*3 vertices
+static GLfloat g_vertex_buffer_data_cube[] = {
+	-1.0f,-1.0f,-1.0f, // triangle 1 : begin
+	-1.0f,-1.0f, 1.0f,
+	-1.0f, 1.0f, 1.0f, // triangle 1 : end
+	1.0f, 1.0f,-1.0f, // triangle 2 : begin
+	-1.0f,-1.0f,-1.0f,
+	-1.0f, 1.0f,-1.0f, // triangle 2 : end
+	1.0f,-1.0f, 1.0f,
+	-1.0f,-1.0f,-1.0f,
+	1.0f,-1.0f,-1.0f,
+	1.0f, 1.0f,-1.0f,
+	1.0f,-1.0f,-1.0f,
+	-1.0f,-1.0f,-1.0f,
+	-1.0f,-1.0f,-1.0f,
+	-1.0f, 1.0f, 1.0f,
+	-1.0f, 1.0f,-1.0f,
+	1.0f,-1.0f, 1.0f,
+	-1.0f,-1.0f, 1.0f,
+	-1.0f,-1.0f,-1.0f,
+	-1.0f, 1.0f, 1.0f,
+	-1.0f,-1.0f, 1.0f,
+	1.0f,-1.0f, 1.0f,
+	1.0f, 1.0f, 1.0f,
+	1.0f,-1.0f,-1.0f,
+	1.0f, 1.0f,-1.0f,
+	1.0f,-1.0f,-1.0f,
+	1.0f, 1.0f, 1.0f,
+	1.0f,-1.0f, 1.0f,
+	1.0f, 1.0f, 1.0f,
+	1.0f, 1.0f,-1.0f,
+	-1.0f, 1.0f,-1.0f,
+	1.0f, 1.0f, 1.0f,
+	-1.0f, 1.0f,-1.0f,
+	-1.0f, 1.0f, 1.0f,
+	1.0f, 1.0f, 1.0f,
+	-1.0f, 1.0f, 1.0f,
+	1.0f,-1.0f, 1.0f
+};
+//Ine color for each vertex
+//To draw Cube - 12 triangles, each 3 vertex, for each vertex 3 components(RGB)
+static GLfloat g_color_buffer_data[12*3*3];
+
+//THis is not going to work anyway, just testing
+// Two UV coordinatesfor each vertex. They were created with Blender. You'll learn shortly how to do this yourself.
+static GLfloat g_uv_buffer_data[] = {
+    0.000059f, 1.0f-0.000004f,
+    0.000103f, 1.0f-0.336048f,
+    0.335973f, 1.0f-0.335903f,
+    1.000023f, 1.0f-0.000013f,
+    0.667979f, 1.0f-0.335851f,
+    0.999958f, 1.0f-0.336064f,
+    0.667979f, 1.0f-0.335851f,
+    0.336024f, 1.0f-0.671877f,
+    0.667969f, 1.0f-0.671889f,
+    1.000023f, 1.0f-0.000013f,
+    0.668104f, 1.0f-0.000013f,
+    0.667979f, 1.0f-0.335851f,
+    0.000059f, 1.0f-0.000004f,
+    0.335973f, 1.0f-0.335903f,
+    0.336098f, 1.0f-0.000071f,
+    0.667979f, 1.0f-0.335851f,
+    0.335973f, 1.0f-0.335903f,
+    0.336024f, 1.0f-0.671877f,
+    1.000004f, 1.0f-0.671847f,
+    0.999958f, 1.0f-0.336064f,
+    0.667979f, 1.0f-0.335851f,
+    0.668104f, 1.0f-0.000013f,
+    0.335973f, 1.0f-0.335903f,
+    0.667979f, 1.0f-0.335851f,
+    0.335973f, 1.0f-0.335903f,
+    0.668104f, 1.0f-0.000013f,
+    0.336098f, 1.0f-0.000071f,
+    0.000103f, 1.0f-0.336048f,
+    0.000004f, 1.0f-0.671870f,
+    0.336024f, 1.0f-0.671877f,
+    0.000103f, 1.0f-0.336048f,
+    0.336024f, 1.0f-0.671877f,
+    0.335973f, 1.0f-0.335903f,
+    0.667969f, 1.0f-0.671889f,
+    1.000004f, 1.0f-0.671847f,
+    0.667979f, 1.0f-0.335851f
 };
 
 //GLOBALS
 SDL_Window* mainWindow;
 SDL_GLContext glContext;
 
+int xpos, ypos;//mouse coords
+//3D camera settings
+glm::mat4 FPSViewMatrix;
+glm::mat4 FPSProjectionMatrix;
+// Initial camera position : on +Z
+glm::vec3 position = glm::vec3( 0, 0, 5 );
+// horizontal angle : toward -Z
+float horizontalAngle = 3.14f;
+// vertical angle : 0, look at the horizon
+float verticalAngle = 0.0f;
+// Initial Field of View
+const float initialFoV = 45.0f;
+glm::vec3 direction;
+glm::vec3 right;
+glm::vec3 up;
+
+bool forwardPressed = false;
+bool backPressed = false;
+bool leftPressed = false;
+bool rightPressed = false;
+
+float speed = 0.5f; // 0.5 units / second
+float mouseSpeed = 0.0001f;
+
 //FUNCTIONS
 bool initSystems();
 GLuint loadShaders(const char* vertexFilePath, const char* fragmentFilePath);
-void renderTriangle(GLuint vertexBuffer);
+void renderTriangles(GLuint count, GLuint vertexBuffer, GLuint colorBuffer = 0, GLuint textureBuffer = 0);
+
+void computeMatricesFromInputs();
+bool loadTexture(GLuint* texture, const char * filePath);
+//bool loadTexture(GLuint* texture, const char * filePath, GLuint width = 0, GLuint height = 0);
+
+GLuint createVAO() {
+	GLuint vaoID;
+	glGenVertexArrays(1, &vaoID);
+	glBindVertexArray(vaoID);
+	return vaoID;
+}
+
+GLuint createVBO() {
+	GLuint vboID;
+	glGenBuffers(1, &vboID);
+	return vboID;
+}
+
+void loadDataIntoVBO(GLuint vboID, GLfloat* data, int dataLength, GLenum usage) {
+	glBindBuffer(GL_ARRAY_BUFFER, vboID);
+	// Give our vertices to OpenGL.
+	glBufferData(GL_ARRAY_BUFFER, dataLength * sizeof(GLfloat), data, usage);
+}
+
+void configureVBO(int vertexAttributeID, GLuint vboID, int dataPerVertex) {
+	glEnableVertexAttribArray(vertexAttributeID);
+	glBindBuffer(GL_ARRAY_BUFFER, vboID);
+	glVertexAttribPointer(vertexAttributeID, dataPerVertex, GL_FLOAT, GL_FALSE, 0, (void*)0);
+}
+
 
 int main(int argc, char *argv[]){
+
+	//Init random seed
+	//For truly random numbers, Perlin Noise?
+	srand (static_cast <unsigned> (time(0)));
+	//Generate random colors
+	for (int v = 0; v < 12*3 ; v++) {
+		g_color_buffer_data[3*v+0] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+		g_color_buffer_data[3*v+1] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+		g_color_buffer_data[3*v+2] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+	}
 
 	if (!initSystems()) {
 		return -1;
 	}
 
-	glm::mat4 myMatrix = glm::translate(glm::mat4(), glm::vec3(10.0f, 0.0f, 0.0f));
-	glm::vec4 myVector(10.0f, 10.0f, 10.0f, 0.0f);//1-point, 0 - direction
-	// fill myMatrix and myVector somehow
-	glm::vec4 transformedVector = myMatrix * myVector; // Again, in this order ! this is important.
-
-	glm::mat4 myIdentityMatrix = glm::mat4(1.0f);
-
-	//glm::mat4 myScalingMatrix = glm::scale(2.0f, 2.0f ,2.0f);
-
-	//Most common order for game characters
-	//REMEMBER: matrix multiplication order does matter!
-	//TransformedVector = TranslationMatrix * RotationMatrix * ScaleMatrix * OriginalVector;
-
-	//Transformation flow:
+	//IMPORTANT! myVector(x, y, z, w);//w == 1-point, w == 0 - direction
+	//Transformation matrices flow:
 	//	Model coords -> Model Matrix
 	//	Worlds coords -> View Matrix
 	//	Camera coords -> Projection Matrix
 	//	Homogeneous Coords
-	//GLM helper matrices
-	//CAMERA MATRIX
-	//glm::mat4 CameraMatrix = glm::lookAt(
-    //cameraPosition, // the position of your camera, in world space
-    //cameraTarget,   // where you want to look at, in world space
-    //upVector        // probably glm::vec3(0,1,0), but (0,-1,0) would make you looking upside-down, which can be great too
-	//);
-	// Generates a really hard-to-read matrix, but a normal, standard 4x4 matrix nonetheless
-	//PROJECTION MATRIX
-	//glm::mat4 projectionMatrix = glm::perspective(
-    //glm::radians(FoV), // The vertical Field of View, in radians: the amount of "zoom". Think "camera lens". Usually between 90° (extra wide) and 30° (quite zoomed in)
-    //4.0f / 3.0f,       // Aspect Ratio. Depends on the size of your window. Notice that 4/3 == 800/600 == 1280/960, sounds familiar ?
-    //0.1f,              // Near clipping plane. Keep as big as possible, or you'll get precision issues.
-    //100.0f             // Far clipping plane. Keep as little as possible.
-	//);
+	//REMEMBER: matrix multiplication order does matter!
+	//Most common order for game characters
+	//TransformedVector = TranslationMatrix * RotationMatrix * ScaleMatrix * OriginalVector;
 
-
-	//CREATE VAO
 	//Do this once window is created(And GL Context too) and before any other OpenGL calls
-	GLuint VertexArrayID;
-	glGenVertexArrays(1, &VertexArrayID);
-	glBindVertexArray(VertexArrayID);
+	GLuint VertexArrayID = createVAO();
 
-	//BIND VERTICS TO VERTEX BUFFER
-	GLuint vertexbuffer;
-	glGenBuffers(1, &vertexbuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-	// Give our vertices to OpenGL.
-	glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
+	// Create and compile our GLSL program from the shaders
+	ShaderLoader shaderProgram = ShaderLoader("/Users/madvi11ain/OpenGLTest/shader.vert", "/Users/madvi11ain/OpenGLTest/shader.frag");
+	shaderProgram.loadShaders();
+	GLuint shaderProgramID = shaderProgram.getShaderProgram();
+
+	GLuint triangleVertexBuffer = createVBO();
+	loadDataIntoVBO(triangleVertexBuffer, g_vertex_buffer_data_triangle, 9, GL_STATIC_DRAW);
+
+	GLuint cubeVertexBuffer = createVBO();
+	loadDataIntoVBO(cubeVertexBuffer, g_vertex_buffer_data_cube, 3 * 3 * 12, GL_STATIC_DRAW);
+
+	//color vertex for cube
+	GLuint colorbuffer = createVBO();
+	loadDataIntoVBO(colorbuffer, g_color_buffer_data, 3 * 3 * 12, GL_STATIC_DRAW);
+
+	//Load texture
+	GLuint textureID;
+	if(!loadTexture(&textureID, "./brick_wall.png")) {
+		std::cout << "Couldn't load texture..\n";
+	}
+
+	//color vertex for cube
+	GLuint texturebuffer = createVBO();
+	loadDataIntoVBO(texturebuffer, g_uv_buffer_data, 3 * 3 * 12, GL_STATIC_DRAW);
+
+	// Get a handle for our "MVP" uniform
+	GLuint matrixID = glGetUniformLocation(shaderProgramID, "MVP");
 
 	//FIrst clear screen to black
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 	SDL_GL_SwapWindow(mainWindow);
 
-	// Create and compile our GLSL program from the shaders
-	GLuint shaderProgramID = loadShaders( "shader.vert", "shader.frag" );
-
 	bool isRunning = true;
 	//Main loop
 	while(isRunning) {
 
+		Uint32 time = SDL_GetTicks();
+
+		// Enable depth test
+		glEnable(GL_DEPTH_TEST);
+		// Accept fragment if it closer to the camera than the former one
+		glDepthFunc(GL_LESS);
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		//Make colors change each frame randomly
+		for (int v = 0; v < 12*3 ; v++) {
+			g_color_buffer_data[3*v+0] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+			g_color_buffer_data[3*v+1] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+			g_color_buffer_data[3*v+2] = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+		}
+		//load updated color data
+		loadDataIntoVBO(colorbuffer, g_color_buffer_data, 3 * 3 * 12, GL_DYNAMIC_DRAW);
+
 		glUseProgram(shaderProgramID);
-		renderTriangle(vertexbuffer);
+
+		// Compute the MVP matrix from keyboard and mouse input
+		computeMatricesFromInputs();
+		glm::mat4 ModelMatrix = glm::mat4(1.0);
+		glm::mat4 MVP = FPSProjectionMatrix * FPSViewMatrix * ModelMatrix;
+
+		// Send our transformation to the currently bound shader, in the "MVP" uniform
+		glUniformMatrix4fv(matrixID, 1, GL_FALSE, &MVP[0][0]);
+
+		//renderTriangles(12, cubeVertexBuffer, 0, texturebuffer);
+		renderTriangles(12, cubeVertexBuffer, colorbuffer);
+
+		glUniformMatrix4fv(matrixID, 1, GL_FALSE, &MVP[0][0]);
+
+		renderTriangles(3, triangleVertexBuffer);
+
 		SDL_GL_SwapWindow(mainWindow);
 
 		SDL_Event event;
@@ -109,6 +287,12 @@ int main(int argc, char *argv[]){
 		{
 			if (event.type == SDL_QUIT)
 				isRunning = false;
+			if( event.type == SDL_MOUSEMOTION )
+			{
+				//Get the mouse offsets
+				xpos = event.motion.x;
+				ypos = event.motion.y;
+			}
 			if (event.type == SDL_KEYDOWN)
 			{
 				switch (event.key.keysym.sym)
@@ -116,29 +300,48 @@ int main(int argc, char *argv[]){
 					case SDLK_ESCAPE:
 						isRunning = false;
 						break;
-					case SDLK_r:
-						// Cover with red and update
-						glClearColor(1.0, 0.0, 0.0, 1.0);
-						glClear(GL_COLOR_BUFFER_BIT);
-						SDL_GL_SwapWindow(mainWindow);
-						break;
 					case SDLK_g:
 						// Cover with green and update
 						glClearColor(0.0, 1.0, 0.0, 1.0);
 						glClear(GL_COLOR_BUFFER_BIT);
 						SDL_GL_SwapWindow(mainWindow);
 						break;
-					case SDLK_b:
-						// Cover with blue and update
-						glClearColor(0.0, 0.0, 1.0, 1.0);
-						glClear(GL_COLOR_BUFFER_BIT);
+					case SDLK_t:
+						glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+						renderTriangles(3, triangleVertexBuffer);
 						SDL_GL_SwapWindow(mainWindow);
 						break;
+					case SDLK_w:
+						forwardPressed = true;
+						break;
+					case SDLK_s:
+						backPressed = true;
+						break;
+					case SDLK_a:
+						leftPressed = true;
+						break;
 					case SDLK_d:
-						glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-						glUseProgram(shaderProgramID);
-						renderTriangle(vertexbuffer);
-						SDL_GL_SwapWindow(mainWindow);
+						rightPressed = true;
+						break;
+					default:
+						break;
+				}
+			}
+			if (event.type == SDL_KEYUP)
+			{
+				switch (event.key.keysym.sym)
+				{
+					case SDLK_w:
+						forwardPressed = false;
+						break;
+					case SDLK_s:
+						backPressed = false;
+						break;
+					case SDLK_a:
+						leftPressed = false;
+						break;
+					case SDLK_d:
+						rightPressed = false;
 						break;
 					default:
 						break;
@@ -146,25 +349,139 @@ int main(int argc, char *argv[]){
 			}
 		}
 
+		//Limit FPS
+		if(ScreenTicksPerFrame>(SDL_GetTicks()-time))
+		{
+			SDL_Delay(ScreenTicksPerFrame-(SDL_GetTicks()-time)); //SDL_Delay pauses the execution.
+		}
 	}
 
 	return 0;
 }
 
-void renderTriangle(GLuint vertexBuffer) {
-	glEnableVertexAttribArray(0);
-	glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-	glVertexAttribPointer(
-			0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
-			3,                  // size
-			GL_FLOAT,           // type
-			GL_FALSE,           // normalized?
-			0,                  // stride
-			(void*)0            // array buffer offset
+//We only pass VBOs which change on every frame
+void renderTriangles(GLuint count, GLuint vertexBuffer, GLuint colorBuffer, GLuint textureBuffer) {
+
+	if (vertexBuffer) {
+		configureVBO(0, vertexBuffer, 3);
+		//glDisableVertexAttribArray(0);
+	}
+	if (textureBuffer) {
+		configureVBO(1, textureBuffer, 2);
+		//glDisableVertexAttribArray(1);
+	}
+	if (colorBuffer) {
+		// 2nd attribute buffer : colors
+		configureVBO(2, colorBuffer, 3);
+		//glDisableVertexAttribArray(2);
+	}
+	//Draw triangles
+	glDrawArrays(GL_TRIANGLES, 0, count*3); // 12*3 indices starting at 0 -> 12 triangles -> 6 squares
+}
+
+//Calculate Projection matrices from keyboard and mouse inputs
+void computeMatricesFromInputs() {
+
+	static Uint32 lastTime = SDL_GetTicks();//this is called only once, first time function is called
+
+	//Get difference between current and last frame
+	Uint32 currentTime = SDL_GetTicks();
+	float deltaTime = float(currentTime = lastTime);
+	// Reset mouse position for next frame
+	SDL_WarpMouseInWindow(mainWindow, screenWidth/2, screenHeight/2);
+
+	// Compute new orientation
+	horizontalAngle += mouseSpeed * deltaTime * float(screenWidth/2 - xpos );
+	verticalAngle   += mouseSpeed * deltaTime * float( screenHeight/2 - ypos );
+
+	// Direction : Spherical coordinates to Cartesian coordinates conversion
+	direction = glm::vec3(
+		cos(verticalAngle) * sin(horizontalAngle),
+		sin(verticalAngle),
+		cos(verticalAngle) * cos(horizontalAngle)
+	);
+	// Right vector
+	right = glm::vec3(
+		sin(horizontalAngle - 3.14f/2.0f),
+		0,
+		cos(horizontalAngle - 3.14f/2.0f)
+	);
+	// Up vector : perpendicular to both direction and right
+	up = glm::cross( right, direction );
+
+	// Move forward
+	if (forwardPressed){
+		position += direction * deltaTime * speed;
+	}
+	// Move backward
+	if (backPressed){
+		position -= direction * deltaTime * speed;
+	}
+	// Strafe right
+	if (rightPressed){
+		position += right * deltaTime * speed;
+	}
+	// Strafe left
+	if (leftPressed){
+		position -= right * deltaTime * speed;
+	}
+
+	// Projection matrix : 45&deg; Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
+	FPSProjectionMatrix = glm::perspective(glm::radians(initialFoV), 4.0f / 3.0f, 0.1f, 100.0f);
+	// Camera matrix
+	FPSViewMatrix =  glm::lookAt(
+			position,           // Camera is here
+			position+direction, // and looks here : at the same position, plus "direction"
+			up                  // Head is up (set to 0,-1,0 to look upside-down)
 			);
-	// Draw the triangle !
-	glDrawArrays(GL_TRIANGLES, 0, 3); // Starting from vertex 0; 3 vertices total -> 1 triangle
-	glDisableVertexAttribArray(0);
+
+	// For the next frame, the "last time" will be "now"
+	lastTime = currentTime;
+}
+
+bool loadTexture(GLuint* texture, const char * filePath/*, GLuint& width, GLuint& height*/) {
+
+	//TODO: Use compressed textures, 20% increase in performance
+
+	// You should probably use CSurface::OnLoad ... ;)
+	//-- and make sure the Surface pointer is good!
+	SDL_Surface* surface = IMG_Load(filePath);
+
+	if(!surface) {
+		return false;
+	}
+
+	 if(surface){
+        // Check that the image’s width is a power of 2
+        if ( (surface->w & (surface->w - 1)) != 0 ) {
+			std::cout << "Warning: image.bmp’s width is not a power of 2\n" << std::endl;
+        }
+
+        // Also check if the height is a power of 2
+        if ( (surface->h & (surface->h - 1)) != 0 ) {
+			std::cout << "Warning: image.bmp’s height is not a power of 2\n" << std::endl;
+        }
+	 }
+
+	glGenTextures(1, texture);
+	glBindTexture(GL_TEXTURE_2D, *texture);
+
+	int Mode = GL_RGB;
+
+	if(surface->format->BytesPerPixel == 4) {
+		Mode = GL_RGBA;
+	}
+
+	// Give the image to OpenGL
+	std::cout << surface->w << std::endl;
+	std::cout << surface->h << std::endl;
+	glTexImage2D(GL_TEXTURE_2D, 0, Mode, surface->w, surface->h, 0, Mode, GL_UNSIGNED_BYTE, surface->pixels);
+
+	//Also GL_LINEAR
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	return true;
 }
 
 bool initSystems() {
@@ -202,99 +519,8 @@ bool initSystems() {
 	glContext = SDL_GL_CreateContext(mainWindow);
 
 	// Init GLEW
-	// Apparently, this is needed for Apple. Thanks to Ross Vander for letting me know
-	//#ifndef __APPLE__
 	glewExperimental = GL_TRUE;
 	glewInit();
-	//#endif
 
 	return true;
-}
-
-GLuint loadShaders(const char* vertexFilePath, const char* fragmentFilePath)
-{
-	// Create the shaders
-	GLuint vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
-	GLuint fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
-
-	// Read the Vertex Shader code from the file
-	std::string vertexShaderCode;
-	std::ifstream vertexShaderStream(vertexFilePath, std::ios::in);
-	if(vertexShaderStream.is_open()){
-		std::string Line = "";
-		while(getline(vertexShaderStream, Line))
-			vertexShaderCode += "\n" + Line;
-		vertexShaderStream.close();
-	}else{
-		printf("Impossible to open %s. Are you in the right directory ?\n", vertexFilePath);
-		getchar();
-		return 0;
-	}
-
-	// Read the Fragment Shader code from the file
-	std::string fragmentShaderCode;
-	std::ifstream fragmentShaderStream(fragmentFilePath, std::ios::in);
-	if(fragmentShaderStream.is_open()){
-		std::string Line = "";
-		while(getline(fragmentShaderStream, Line))
-			fragmentShaderCode += "\n" + Line;
-		fragmentShaderStream.close();
-	}
-
-	GLint result = GL_FALSE;
-	int InfoLogLength;
-
-	// Compile Vertex Shader
-	printf("Compiling shader : %s\n", vertexFilePath);
-	char const * VertexSourcePointer = vertexShaderCode.c_str();
-	glShaderSource(vertexShaderID, 1, &VertexSourcePointer , NULL);
-	glCompileShader(vertexShaderID);
-
-	// Check Vertex Shader
-	glGetShaderiv(vertexShaderID, GL_COMPILE_STATUS, &result);
-	glGetShaderiv(vertexShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
-	if ( InfoLogLength > 0 ){
-		std::vector<char> vertexShaderErrorMessage(InfoLogLength+1);
-		glGetShaderInfoLog(vertexShaderID, InfoLogLength, NULL, &vertexShaderErrorMessage[0]);
-		printf("%s\n", &vertexShaderErrorMessage[0]);
-	}
-
-	// Compile Fragment Shader
-	printf("Compiling shader : %s\n", fragmentFilePath);
-	char const * FragmentSourcePointer = fragmentShaderCode.c_str();
-	glShaderSource(fragmentShaderID, 1, &FragmentSourcePointer , NULL);
-	glCompileShader(fragmentShaderID);
-
-	// Check Fragment Shader
-	glGetShaderiv(fragmentShaderID, GL_COMPILE_STATUS, &result);
-	glGetShaderiv(fragmentShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
-	if ( InfoLogLength > 0 ){
-		std::vector<char> fragmentShaderErrorMessage(InfoLogLength+1);
-		glGetShaderInfoLog(fragmentShaderID, InfoLogLength, NULL, &fragmentShaderErrorMessage[0]);
-		printf("%s\n", &fragmentShaderErrorMessage[0]);
-	}
-
-	// Link the program
-	printf("Linking program\n");
-	GLuint programID = glCreateProgram();
-	glAttachShader(programID, vertexShaderID);
-	glAttachShader(programID, fragmentShaderID);
-	glLinkProgram(programID);
-
-	// Check the program
-	glGetProgramiv(programID, GL_LINK_STATUS, &result);
-	glGetProgramiv(programID, GL_INFO_LOG_LENGTH, &InfoLogLength);
-	if ( InfoLogLength > 0 ){
-		std::vector<char> programErrorMessage(InfoLogLength+1);
-		glGetProgramInfoLog(programID, InfoLogLength, NULL, &programErrorMessage[0]);
-		printf("%s\n", &programErrorMessage[0]);
-	}
-
-	glDetachShader(programID, vertexShaderID);
-	glDetachShader(programID, fragmentShaderID);
-
-	glDeleteShader(vertexShaderID);
-	glDeleteShader(fragmentShaderID);
-
-	return programID;
 }
